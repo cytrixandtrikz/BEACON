@@ -258,6 +258,7 @@
         let lastPingTime = null;
         let map = null;
         let marker = null; // Global marker for Leaflet map
+        let clientPublicIp = 'Unknown'; // Variable to store client's public IP
 
         // Define a custom yellow dot icon
         const yellowDotIcon = L.divIcon({
@@ -278,6 +279,19 @@
             }
         }
 
+        // Function to get the client's public IP address
+        async function getPublicIpAddress() {
+            try {
+                const response = await fetch('https://api.ipify.org?format=json');
+                const data = await response.json();
+                clientPublicIp = data.ip;
+                console.log('Client Public IP:', clientPublicIp);
+            } catch (error) {
+                console.error('Error fetching public IP:', error);
+                clientPublicIp = 'Unknown';
+            }
+        }
+
         async function getPingStatus() {
             const statusDiv = document.getElementById('pingStatusDisplay');
             const monitoredDeviceSpan = document.getElementById('monitoredDevice');
@@ -292,10 +306,8 @@
             pingOutputText.textContent = 'Loading...';
 
             try {
-                // Changed to absolute URL to avoid "Failed to parse URL" error
-                // This assumes your Flask server runs on http://127.0.0.1:5000/
-                // If you deploy your Flask server publicly, replace this with its public URL.
-                const response = await fetch('http://127.0.0.1:5000/get_ping_status'); 
+                // Pass clientPublicIp as a query parameter
+                const response = await fetch(`http://127.0.0.1:5000/get_ping_status?client_public_ip=${clientPublicIp}`); 
                 const data = await response.json();
 
                 monitoredDeviceSpan.textContent = data.target_device;
@@ -393,7 +405,8 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            await getPublicIpAddress(); // Get public IP before starting pings
             initMap(); // Initialize map when DOM is ready
             getPingStatus();
             setInterval(getPingStatus, REFRESH_INTERVAL_MS);
