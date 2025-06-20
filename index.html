@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BEACON Tracker</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Leaflet CSS for maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <!-- Leaflet JS for maps -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -91,6 +95,15 @@
             }
         }
 
+        #mapid {
+            height: 300px; /* Set a height for the map container */
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+            background-color: #333; /* Placeholder background */
+        }
+
         #pingStatusDisplay {
             width: 100%;
             min-height: 180px;
@@ -105,12 +118,6 @@
             text-align: center;
             position: relative;
             overflow: hidden;
-            background-image: 
-                radial-gradient(circle at center, transparent 0%, transparent 10%, #3a3a5a 10%, #3a3a5a 11%, transparent 11%),
-                linear-gradient(to right, #3a3a5a 1px, transparent 1px),
-                linear-gradient(to bottom, #3a3a5a 1px, transparent 1px);
-            background-size: 20px 20px, 20px 20px, 20px 20px;
-            background-repeat: repeat;
         }
 
         #targetInfo {
@@ -181,6 +188,23 @@
             width: 100%;
             word-wrap: break-word;
         }
+        
+        #locationDetails {
+            font-size: 1em;
+            color: #b0b0b0;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        /* Custom marker styling */
+        .yellow-dot-marker {
+            background-color: yellow;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            border: 2px solid #333;
+            box-shadow: 0 0 5px rgba(255, 255, 0, 0.7);
+        }
 
         @media (max-width: 600px) {
             .container {
@@ -196,6 +220,9 @@
             #newPingOverlay {
                 font-size: 2.2em;
             }
+            #mapid {
+                height: 250px; /* Adjust height for mobile */
+            }
         }
     </style>
 </head>
@@ -209,6 +236,9 @@
             <div class="beacon-wave" style="width: 100px; height: 100px;"></div>
             <div class="beacon-wave" style="width: 150px; height: 150px;"></div>
         </div>
+
+        <div id="mapid"></div> <!-- Map will be rendered here -->
+        <p id="locationDetails">Location: N/A</p>
 
         <div id="pingStatusDisplay">
             <p id="targetInfo">Monitoring: <span id="monitoredDevice">Loading...</span></p>
@@ -226,6 +256,27 @@
         const NEW_PING_DISPLAY_DURATION_MS = 3000;
 
         let lastPingTime = null;
+        let map = null;
+        let marker = null; // Global marker for Leaflet map
+
+        // Define a custom yellow dot icon
+        const yellowDotIcon = L.divIcon({
+            className: 'yellow-dot-marker',
+            iconSize: [15, 15], // size of the icon
+            iconAnchor: [7.5, 7.5], // point of the icon which will correspond to marker's location
+            popupAnchor: [0, -7.5] // point from which the popup should open relative to the iconAnchor
+        });
+
+        // Function to initialize the map
+        function initMap() {
+            if (map === null) { // Only initialize map once
+                map = L.map('mapid').setView([0, 0], 2); // Initial view: center of the world, zoom level 2
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(map);
+            }
+        }
 
         async function getPingStatus() {
             const statusDiv = document.getElementById('pingStatusDisplay');
@@ -234,18 +285,17 @@
             const pingOutputText = document.getElementById('pingOutputText');
             const lastSavedFileSpan = document.getElementById('lastSavedFile');
             const newPingOverlay = document.getElementById('newPingOverlay');
+            const locationDetailsP = document.getElementById('locationDetails');
             
             statusDiv.querySelector('.status-message').textContent = 'Fetching status...';
             statusDiv.querySelector('.status-message').className = 'status-message waiting';
             pingOutputText.textContent = 'Loading...';
 
             try {
-                // IMPORTANT: For local development, if htmlsitetracker.py is serving this HTML,
-                // keep the fetch URL as '/get_ping_status'.
-                // If this HTML is hosted on https://cytrixandtrikz.github.io/BEACON/,
-                // your Python server must be publicly accessible, and you would change this:
-                // For example: const response = await fetch('https://your-public-python-server.com/get_ping_status');
-                const response = await fetch('/get_ping_status'); 
+                // Changed to absolute URL to avoid "Failed to parse URL" error
+                // This assumes your Flask server runs on http://127.0.0.1:5000/
+                // If you deploy your Flask server publicly, replace this with its public URL.
+                const response = await fetch('http://127.0.0.1:5000/get_ping_status'); 
                 const data = await response.json();
 
                 monitoredDeviceSpan.textContent = data.target_device;
@@ -282,6 +332,36 @@
                         className = 'error';
                 }
 
+                // Update Leaflet map with new location data
+                if (data.location_data && data.location_data.lat !== undefined && data.location_data.lon !== undefined) {
+                    const { lat, lon, city, country } = data.location_data;
+                    if (map) {
+                        const newLatLng = L.latLng(lat, lon);
+                        // Use flyTo for animated movement and zoom
+                        map.flyTo(newLatLng, 10, {
+                            duration: 1.5, // seconds for the animation
+                            easeLinearity: 0.5 // animation easing
+                        }); 
+
+                        if (marker) {
+                            marker.setLatLng(newLatLng); // Move existing marker
+                        } else {
+                            // Create new marker with custom yellow icon
+                            marker = L.marker(newLatLng, { icon: yellowDotIcon }).addTo(map); 
+                        }
+                        marker.bindPopup(`<b>${city}, ${country}</b><br>Lat: ${lat}, Lon: ${lon}`).openPopup();
+                    }
+                    locationDetailsP.textContent = `Location: ${city}, ${country}`;
+                } else {
+                    locationDetailsP.textContent = 'Location: N/A';
+                    if (marker) {
+                        map.removeLayer(marker);
+                        marker = null;
+                    }
+                    map.setView([0, 0], 2); // Reset view if no location data
+                }
+
+
                 if (lastPingTime && data.last_update_time !== lastPingTime && pingResult.status !== 'Waiting for first ping...') {
                     newPingOverlay.style.animation = `new-ping-fade ${NEW_PING_DISPLAY_DURATION_MS / 1000}s forwards`;
                     newPingOverlay.style.display = 'flex';
@@ -309,10 +389,12 @@
                 updateTimestampSpan.textContent = new Date().toLocaleTimeString();
                 lastSavedFileSpan.textContent = 'N/A (Server unreachable)';
                 newPingOverlay.style.display = 'none';
+                locationDetailsP.textContent = 'Location: N/A (Server unreachable)';
             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
+            initMap(); // Initialize map when DOM is ready
             getPingStatus();
             setInterval(getPingStatus, REFRESH_INTERVAL_MS);
         });
