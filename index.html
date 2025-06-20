@@ -105,6 +105,12 @@
             text-align: center;
             position: relative;
             overflow: hidden;
+            background-image: 
+                radial-gradient(circle at center, transparent 0%, transparent 10%, #3a3a5a 10%, #3a3a5a 11%, transparent 11%),
+                linear-gradient(to right, #3a3a5a 1px, transparent 1px),
+                linear-gradient(to bottom, #3a3a5a 1px, transparent 1px);
+            background-size: 20px 20px, 20px 20px, 20px 20px;
+            background-repeat: repeat;
         }
 
         #targetInfo {
@@ -234,7 +240,12 @@
             pingOutputText.textContent = 'Loading...';
 
             try {
-                const response = await fetch('/get_ping_status');
+                // IMPORTANT: For local development, if htmlsitetracker.py is serving this HTML,
+                // keep the fetch URL as '/get_ping_status'.
+                // If this HTML is hosted on https://cytrixandtrikz.github.io/BEACON/,
+                // your Python server must be publicly accessible, and you would change this:
+                // For example: const response = await fetch('https://your-public-python-server.com/get_ping_status');
+                const response = await fetch('/get_ping_status'); 
                 const data = await response.json();
 
                 monitoredDeviceSpan.textContent = data.target_device;
