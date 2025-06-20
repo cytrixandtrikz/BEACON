@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BEACON Tracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a2e;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 25px;
+            background-color: #21213f;
+            border-radius: 12px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            border: 1px solid #3a3a5f;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        h1 {
+            color: #00bcd4;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.5em;
+            letter-spacing: 2px;
+            text-shadow: 0 0 10px rgba(0, 188, 212, 0.6);
+        }
+
+        .beacon-signal-container {
+            position: relative;
+            width: 150px;
+            height: 150px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .beacon-dot {
+            width: 20px;
+            height: 20px;
+            background-color: #00bcd4;
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 15px #00bcd4;
+            z-index: 2;
+        }
+
+        .beacon-wave {
+            position: absolute;
+            border: 2px solid #00bcd4;
+            border-radius: 50%;
+            opacity: 0;
+            animation: pulse-wave 2s infinite ease-out;
+            animation-delay: var(--delay);
+            transform: scale(0);
+        }
+
+        .beacon-wave:nth-child(2) {
+            --delay: 0.5s;
+        }
+        .beacon-wave:nth-child(3) {
+            --delay: 1s;
+        }
+
+        @keyframes pulse-wave {
+            0% {
+                transform: scale(0.1);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(1.5);
+                opacity: 0;
+            }
+        }
+
+        #pingStatusDisplay {
+            width: 100%;
+            min-height: 180px;
+            background-color: #2a2a4a;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #targetInfo {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: #b0b0b0;
+        }
+
+        .status-message {
+            font-weight: bold;
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            transition: color 0.3s ease-in-out;
+        }
+
+        .ping-output pre {
+            background-color: #333355;
+            border: 1px solid #444466;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 80px;
+            overflow-y: auto;
+            font-size: 0.85em;
+            color: #b0b0b0;
+            width: 100%;
+            box-sizing: border-box;
+            text-align: left;
+        }
+
+        .status-message.success { color: #4CAF50; }
+        .status-message.failed { color: #F44336; }
+        .status-message.timeout { color: #FFC107; }
+        .status-message.error { color: #9C27B0; }
+        .status-message.waiting { color: #888888; }
+
+        #newPingOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #00bcd4;
+            font-size: 3em;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            animation: none;
+            text-shadow: 0 0 15px #00bcd4;
+        }
+
+        @keyframes new-ping-fade {
+            0% { opacity: 0; transform: scale(0.8); }
+            20% { opacity: 1; transform: scale(1); }
+            80% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.2); }
+        }
+
+        .info-text {
+            font-size: 0.9em;
+            color: #a0a0a0;
+            text-align: center;
+            width: 100%;
+            word-wrap: break-word;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                margin: 20px auto;
+                padding: 15px;
+            }
+            h1 {
+                font-size: 2em;
+            }
+            .status-message {
+                font-size: 1.2em;
+            }
+            #newPingOverlay {
+                font-size: 2.2em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>BEACON</h1>
+
+        <div class="beacon-signal-container">
+            <div class="beacon-dot"></div>
+            <div class="beacon-wave" style="width: 50px; height: 50px;"></div>
+            <div class="beacon-wave" style="width: 100px; height: 100px;"></div>
+            <div class="beacon-wave" style="width: 150px; height: 150px;"></div>
+        </div>
+
+        <div id="pingStatusDisplay">
+            <p id="targetInfo">Monitoring: <span id="monitoredDevice">Loading...</span></p>
+            <p class="status-message waiting">Initializing tracker...</p>
+            <div class="ping-output"><pre id="pingOutputText">No ping data yet.</pre></div>
+            <div id="newPingOverlay">NEW PING</div>
+        </div>
+
+        <p class="info-text">Last updated: <span id="updateTimestamp">N/A</span></p>
+        <p class="info-text">Last saved to: <span id="lastSavedFile">N/A</span></p>
+    </div>
+
+    <script>
+        const REFRESH_INTERVAL_MS = 5000;
+        const NEW_PING_DISPLAY_DURATION_MS = 3000;
+
+        let lastPingTime = null;
+
+        async function getPingStatus() {
+            const statusDiv = document.getElementById('pingStatusDisplay');
+            const monitoredDeviceSpan = document.getElementById('monitoredDevice');
+            const updateTimestampSpan = document.getElementById('updateTimestamp');
+            const pingOutputText = document.getElementById('pingOutputText');
+            const lastSavedFileSpan = document.getElementById('lastSavedFile');
+            const newPingOverlay = document.getElementById('newPingOverlay');
+            
+            statusDiv.querySelector('.status-message').textContent = 'Fetching status...';
+            statusDiv.querySelector('.status-message').className = 'status-message waiting';
+            pingOutputText.textContent = 'Loading...';
+
+            try {
+                const response = await fetch('/get_ping_status');
+                const data = await response.json();
+
+                monitoredDeviceSpan.textContent = data.target_device;
+                updateTimestampSpan.textContent = data.last_update_time;
+                lastSavedFileSpan.textContent = data.last_saved_file;
+
+                const pingResult = data.ping_result;
+                let message = '';
+                let className = '';
+
+                switch (pingResult.status) {
+                    case 'success':
+                        message = 'Device is REACHABLE!';
+                        className = 'success';
+                        break;
+                    case 'failed':
+                        message = 'Device ping FAILED.';
+                        className = 'failed';
+                        break;
+                    case 'timeout':
+                        message = 'Ping TIMED OUT.';
+                        className = 'timeout';
+                        break;
+                    case 'error':
+                        message = 'SERVER ERROR: ' + pingResult.output;
+                        className = 'error';
+                        break;
+                    case 'Waiting for first ping...':
+                        message = 'Waiting for initial ping from server...';
+                        className = 'waiting';
+                        break;
+                    default:
+                        message = 'Unknown status: ' + pingResult.status;
+                        className = 'error';
+                }
+
+                if (lastPingTime && data.last_update_time !== lastPingTime && pingResult.status !== 'Waiting for first ping...') {
+                    newPingOverlay.style.animation = `new-ping-fade ${NEW_PING_DISPLAY_DURATION_MS / 1000}s forwards`;
+                    newPingOverlay.style.display = 'flex';
+
+                    setTimeout(() => {
+                        newPingOverlay.style.animation = 'none';
+                        newPingOverlay.style.display = 'none';
+                        statusDiv.querySelector('.status-message').textContent = message;
+                        statusDiv.querySelector('.status-message').className = `status-message ${className}`;
+                        pingOutputText.textContent = pingResult.output;
+                    }, NEW_PING_DISPLAY_DURATION_MS);
+                } else {
+                    statusDiv.querySelector('.status-message').textContent = message;
+                    statusDiv.querySelector('.status-message').className = `status-message ${className}`;
+                    pingOutputText.textContent = pingResult.output;
+                    newPingOverlay.style.display = 'none';
+                }
+
+                lastPingTime = data.last_update_time;
+
+            } catch (error) {
+                statusDiv.querySelector('.status-message').textContent = `Connection Error: ${error.message}`;
+                statusDiv.querySelector('.status-message').className = 'status-message error';
+                pingOutputText.textContent = 'Could not connect to server.';
+                updateTimestampSpan.textContent = new Date().toLocaleTimeString();
+                lastSavedFileSpan.textContent = 'N/A (Server unreachable)';
+                newPingOverlay.style.display = 'none';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            getPingStatus();
+            setInterval(getPingStatus, REFRESH_INTERVAL_MS);
+        });
+    </script>
+</body>
+</html>
